@@ -1,4 +1,4 @@
-﻿#include "WidgetOSRItem.h"
+#include "WidgetOSRItem.h"
 #include <QWidget>
 #include <QPainter>
 #include <QDebug>
@@ -56,6 +56,101 @@ void WidgetOSRItem::paint(QPainter *painter)
 
     painter->restore();
 }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+
+bool WidgetOSRItem::eventFilter(QObject *obj, QEvent *e)
+{
+    QWindow* pw = (QWindow*)(window());
+    bool res = QQuickPaintedItem::eventFilter(obj, e);
+    if(obj == mOSRWidget)
+    {
+        switch(e->type())
+        {
+        case QEvent::Paint: //当OsrWidget paint的时候也触发自己paint
+        {
+            QPaintEvent* pe = (QPaintEvent*)e;
+            this->update(pe->rect());
+        }
+            break;
+        }
+    }
+    else if(obj == pw)
+    {
+
+        //* 如果是鼠标等（有鼠标坐标信息的事件。）的话我们得计算一下偏移量并修正一下，这里就只处理QMouseEvent和QWheelEvent作为示例
+        //* 如果有其他类似的也需要修正，不然可能坐标偏移
+        switch(e->type())
+        {
+        case QEvent::MouseButtonDblClick  :
+        case QEvent::MouseButtonPress	  :
+        case QEvent::MouseButtonRelease	  :
+        case QEvent::MouseMove	          :
+        case QEvent::MouseTrackingChange  :
+        case QEvent::Move	              :
+        {
+            QMouseEvent *me = (QMouseEvent*)e;
+            QEvent::Type type = me->type();
+            QPointF localPosF(QPointF(0,0));
+//          QPointF localPosF = me->position();
+            Qt::MouseButton mouseButton = me->button();
+            Qt::MouseButtons mouseButtons = me->buttons();
+            Qt::KeyboardModifiers modifiers = me->modifiers();
+
+            //修正一下localpos
+            QPointF offsetF = mapToScene(QPoint(0,0));
+            QPointF diffPosF = localPosF - offsetF;
+
+            QMouseEvent tme(type, diffPosF, mouseButton, mouseButtons, modifiers);
+            sendEventToOSRWidget(&tme);
+        }
+            break;
+        case QEvent::Wheel:
+        {
+            QWheelEvent *we = (QWheelEvent*)e;
+            QPointF localPosF = we->position();
+            QPointF gloabalPosF = we->globalPosition();
+            QPoint  pixelDelta = we->pixelDelta();
+            QPoint  angleDelta = we->angleDelta();
+
+            Qt::MouseButtons mouseButtons = we->buttons();
+            Qt::KeyboardModifiers modifiers = we->modifiers();
+
+            //修正一下localpos
+            QPointF offsetF = mapToScene(QPoint(0,0));
+            QPointF diffPosF = localPosF - offsetF;
+
+            QWheelEvent twe(diffPosF, gloabalPosF, pixelDelta, angleDelta,
+                               mouseButtons, modifiers, Qt::ScrollBegin, false);
+
+            sendEventToOSRWidget(&twe);
+        }
+
+            break;
+        default:
+        {
+            sendEventToOSRWidget(e);
+        }
+            break;
+        }
+    }
+
+    return res;
+}
+
+
+void WidgetOSRItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+{
+    QQuickPaintedItem::geometryChange(newGeometry, oldGeometry);
+
+    if(mOSRWidget)
+    {
+        mOSRWidget->setGeometry(newGeometry.toRect());
+    }
+}
+
+#else
+
 
 bool WidgetOSRItem::eventFilter(QObject *obj, QEvent *e)
 {
@@ -133,6 +228,7 @@ bool WidgetOSRItem::eventFilter(QObject *obj, QEvent *e)
     return res;
 }
 
+
 void WidgetOSRItem::geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
     QQuickPaintedItem::geometryChanged(newGeometry, oldGeometry);
@@ -143,6 +239,7 @@ void WidgetOSRItem::geometryChanged(const QRectF &newGeometry, const QRectF &old
     }
 }
 
+#endif
 
 bool WidgetOSRItem::event(QEvent *e)
 {
