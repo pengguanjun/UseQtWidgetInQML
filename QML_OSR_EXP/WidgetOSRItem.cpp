@@ -87,12 +87,27 @@ bool WidgetOSRItem::eventFilter(QObject *obj, QEvent *e)
         case QEvent::MouseButtonRelease	  :
         case QEvent::MouseMove	          :
         case QEvent::MouseTrackingChange  :
+	{
+            QMouseEvent *me = (QMouseEvent*)e;
+            QEvent::Type type = me->type();
+            QPointF localPosF = me->position();
+            Qt::MouseButton mouseButton = me->button();
+            Qt::MouseButtons mouseButtons = me->buttons();
+            Qt::KeyboardModifiers modifiers = me->modifiers();
+
+            //修正一下localpos
+            QPointF offsetF = mapToScene(QPoint(0,0));
+            QPointF diffPosF = localPosF - offsetF;
+
+            QMouseEvent tme(type, diffPosF, mouseButton, mouseButtons, modifiers);
+            sendEventToOSRWidget(&tme);
+        }
+            break;
         case QEvent::Move	              :
         {
             QMouseEvent *me = (QMouseEvent*)e;
             QEvent::Type type = me->type();
             QPointF localPosF(QPointF(0,0));
-//          QPointF localPosF = me->position();
             Qt::MouseButton mouseButton = me->button();
             Qt::MouseButtons mouseButtons = me->buttons();
             Qt::KeyboardModifiers modifiers = me->modifiers();
